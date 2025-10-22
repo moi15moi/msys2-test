@@ -1,0 +1,58 @@
+name: Build wheel
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+
+jobs:
+  build-wheel:
+    name: "Build on ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [windows-latest, windows-11-arm]
+      fail-fast: false
+
+    defaults:
+      run:
+        shell: 'msys2 {0}'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+
+    - name: Install platform-specific requirements X64 (Windows)
+      if: runner.os == 'Windows' && runner.arch == 'X64'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: CLANG64
+        path-type: inherit
+        install: >-
+          mingw-w64-clang-x86_64-autotools
+          mingw-w64-clang-x86_64-toolchain
+          mingw-w64-clang-x86_64-nasm
+
+    - name: Install platform-specific requirements ARM64 (Windows)
+      if: runner.os == 'Windows' && runner.arch == 'ARM64'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: CLANGARM64
+        path-type: inherit
+        install: >-
+          mingw-w64-clang-aarch64-autotools
+          mingw-w64-clang-aarch64-toolchain
+          mingw-w64-clang-aarch64-nasm
+
+    - name: Install meson
+      run: pip install meson
+
+    - name: Run build_dependencies.sh
+      run: bash build_dependencies.sh
