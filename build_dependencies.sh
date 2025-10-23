@@ -41,16 +41,34 @@ build_ffmpeg() {
         target_os="--target-os=mingw32"
     fi
 
-    ./configure --prefix=$ABS_BUILD_PATH/usr/local \
-                --enable-static \
-                --disable-shared \
-                --enable-pic \
-                --disable-programs \
-                --disable-debug \
-                --disable-doc \
-                --disable-autodetect \
-                --enable-libdav1d \
-                $target_os
+    # FFMPEG doesn't try to read the env var CC, so let's do it
+    cc=""
+    if [ -n "${CC-}" ]; then
+        cc="--cc=$CC"
+    fi
+
+    # FFMPEG doesn't try to read the env var CXX, so let's do it
+    cxx=""
+    if [ -n "${CXX-}" ]; then
+        cxx="--cxx=$CXX"
+    fi
+
+    if ! ./configure --prefix="$ABS_BUILD_PATH/usr/local" \
+                    --enable-static \
+                    --disable-shared \
+                    --enable-pic \
+                    --disable-programs \
+                    --disable-debug \
+                    --disable-doc \
+                    --disable-autodetect \
+                    --enable-libdav1d \
+                    $target_os \
+                    $cc \
+                    $cxx; then
+        echo "configure failed! Showing config.log:"
+        cat ffbuild/config.log
+        exit 1
+    fi
 
     make
     make install
@@ -70,10 +88,14 @@ build_ffms2() {
     cd ffms2-master
 
     NOCONFIGURE=1 ./autogen.sh
-    ./configure --prefix=$ABS_BUILD_PATH/usr/local \
-                --enable-static \
-                --disable-shared \
-                --with-pic
+    if ! ./configure --prefix=$ABS_BUILD_PATH/usr/local \
+                    --enable-static \
+                    --disable-shared \
+                    --with-pic; then
+        echo "configure failed! Showing config.log:"
+        cat config.log
+        exit 1
+    fi
 
     make
     make install
@@ -99,14 +121,6 @@ main() {
 
     # PKG_CONFIG configuration
     export PKG_CONFIG_PATH="$ABS_BUILD_PATH/usr/local/lib/pkgconfig"
-    if [ -n "${MSYS2_PATH_TYPE-}" ]; then
-        if [ "$MSYS2_PATH_TYPE" = "inherit" ]; then
-            # Convert to Windows-style path
-            PKG_CONFIG_PATH_WIN=$(cygpath -w "$PKG_CONFIG_PATH")
-            export PKG_CONFIG_PATH="$PKG_CONFIG_PATH_WIN"
-        fi
-    fi
-    echo "PKG_CONFIG_PATH is: $PKG_CONFIG_PATH"
 
     # Configure CC/CXX on msys2 on clang system.
     # Otherwise, it use gcc/g++
@@ -118,11 +132,10 @@ main() {
                 ;;
         esac
     fi
- 
+
     # Build dependencies
     echo "--------------------------------------------------------------"
     build_dav1d
-    cat usr/local/lib/pkgconfig/dav1d.pc
     echo "--------------------------------------------------------------"
     build_ffmpeg
     echo "--------------------------------------------------------------"
